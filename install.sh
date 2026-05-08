@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 INSTALLED=0
 
 # --- prompt content ---
@@ -301,11 +301,29 @@ if [ -d "$HOME/.codeium/windsurf" ]; then
     install_flat "Windsurf" "$HOME/.codeium/windsurf/global_workflows" "$BASIC_T_SKILL" "$BASIC_TS_SKILL"
 fi
 
+# OpenClaw
+if [ -d "$HOME/.openclaw" ]; then
+    install_skill "OpenClaw" "$HOME/.openclaw/skills" "$CODEX_T_SKILL" "$CODEX_TS_SKILL"
+    install_skill_extra "$HOME/.openclaw/skills" "t-refresh" "$CODEX_T_REFRESH_SKILL"
+    install_skill_extra "$HOME/.openclaw/skills" "t-cache-stats" "$CODEX_CACHE_STATS_SKILL"
+    install_skill_extra "$HOME/.openclaw/skills" "t-cache-clear" "$CODEX_CACHE_CLEAR_SKILL"
+fi
+
+# Hermes
+if [ -d "$HOME/.hermes" ]; then
+    install_skill "Hermes" "$HOME/.hermes/skills" "$CODEX_T_SKILL" "$CODEX_TS_SKILL"
+    install_skill_extra "$HOME/.hermes/skills" "t-refresh" "$CODEX_T_REFRESH_SKILL"
+    install_skill_extra "$HOME/.hermes/skills" "t-cache-stats" "$CODEX_CACHE_STATS_SKILL"
+    install_skill_extra "$HOME/.hermes/skills" "t-cache-clear" "$CODEX_CACHE_CLEAR_SKILL"
+fi
+
 if [ $INSTALLED -eq 0 ]; then
     echo "未检测到支持的 AI 编程工具，请先安装以下任一工具："
     echo ""
     echo "  Claude Code  https://claude.ai/code"
     echo "  Codex        https://github.com/openai/codex"
+    echo "  OpenClaw     https://github.com/nicepkg/openclaw"
+    echo "  Hermes       https://github.com/nicepkg/hermes"
     echo "  OpenCode     https://github.com/opencode-ai/opencode"
     echo "  Cursor       https://cursor.com"
     echo "  Windsurf     https://windsurf.com"
