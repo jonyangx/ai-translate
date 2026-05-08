@@ -9,6 +9,51 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$SCRIPT_DIR/../data"
 DB_PATH="$DATA_DIR/cache.db"
 
+ensure_sqlite3() {
+    if command -v sqlite3 &>/dev/null; then return 0; fi
+    echo "Installing sqlite3..." >&2
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew &>/dev/null; then
+                brew install sqlite3
+            else
+                echo "error: Homebrew not found, install from https://brew.sh" >&2
+                return 1
+            fi
+            ;;
+        Linux)
+            if command -v apt-get &>/dev/null; then
+                sudo apt-get install -y sqlite3
+            elif command -v yum &>/dev/null; then
+                sudo yum install -y sqlite
+            elif command -v dnf &>/dev/null; then
+                sudo dnf install -y sqlite
+            elif command -v pacman &>/dev/null; then
+                sudo pacman -S --noconfirm sqlite3
+            else
+                echo "error: no supported package manager found" >&2
+                return 1
+            fi
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            if command -v pacman &>/dev/null; then
+                pacman -S --noconfirm sqlite
+            else
+                echo "error: no supported package manager found" >&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "error: unsupported OS $(uname -s)" >&2
+            return 1
+            ;;
+    esac
+    if ! command -v sqlite3 &>/dev/null; then
+        echo "error: sqlite3 installation failed" >&2
+        return 1
+    fi
+}
+
 normalize_input() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
@@ -18,10 +63,7 @@ sqlite3_escape() {
 }
 
 init_db() {
-    if ! command -v sqlite3 &>/dev/null; then
-        echo "error: sqlite3 not found" >&2
-        return 1
-    fi
+    ensure_sqlite3 || return 1
     mkdir -p "$DATA_DIR"
     if [ ! -f "$DB_PATH" ]; then
         sqlite3 "$DB_PATH" <<'SQL'
