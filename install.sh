@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 INSTALLED=0
 
 # --- prompt content ---
@@ -64,6 +64,18 @@ AI 翻译 + 语音朗读（支持中英双向及多语言）@author: stormzhang
 要翻译的内容：$ARGUMENTS
 PROMPT_EOF
 
+# --- cache prompt logic ---
+
+CACHE_CHECK_PROMPT='先用 Bash 工具检查缓存：运行 `bash ./scripts/cache.sh check "输入内容的小写形式"`，如果返回 "hit"，则运行 `bash ./scripts/cache.sh get "输入内容的小写形式"` 获取缓存结果并直接显示，在结果开头加上 📦 图标，不再调用大模型。如果返回 "miss" 或任何错误，继续正常翻译流程。'
+
+CACHE_SAVE_PROMPT='翻译完成后，用 Bash 工具保存结果：运行 `bash ./scripts/cache.sh set "输入内容的小写形式" "原始输入" "翻译结果"`。在翻译结果开头加上 🤖 图标。'
+
+CACHE_REFRESH_PROMPT='先运行 `bash ./scripts/cache.sh clear "输入内容的小写形式"` 清除旧缓存。然后正常翻译，翻译完成后运行 `bash ./scripts/cache.sh set "输入内容的小写形式" "原始输入" "翻译结果"` 保存新结果。在翻译结果开头加上 🔄 图标。'
+
+CACHE_STATS_PROMPT='运行 `bash ./scripts/cache.sh stats` 并显示结果。不要做其他事情。'
+
+CACHE_CLEAR_PROMPT='运行 `bash ./scripts/cache.sh clear-all` 清除所有翻译缓存。显示清除结果。'
+
 # --- tool-specific formats ---
 
 BASIC_T_SKILL="---
@@ -84,10 +96,14 @@ CLAUDE_T_SKILL="---
 name: t
 description: AI 翻译（支持中英双向及多语言）@author: stormzhang
 context: fork
-allowed-tools: []
+allowed-tools: [\"Bash\"]
 ---
 
-$T_MD"
+$CACHE_CHECK_PROMPT
+
+$T_MD
+
+$CACHE_SAVE_PROMPT"
 
 CLAUDE_TS_SKILL="---
 name: ts
@@ -96,7 +112,90 @@ context: fork
 allowed-tools: [\"Bash\"]
 ---
 
-$TS_MD"
+$CACHE_CHECK_PROMPT
+
+$TS_MD
+
+$CACHE_SAVE_PROMPT"
+
+CLAUDE_T_REFRESH_SKILL="---
+name: t-refresh
+description: 刷新翻译缓存并重新查询 AI 翻译
+context: fork
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_REFRESH_PROMPT
+
+$T_MD"
+
+CLAUDE_CACHE_STATS_SKILL="---
+name: t-cache-stats
+description: 显示翻译缓存统计信息
+context: fork
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_STATS_PROMPT"
+
+CLAUDE_CACHE_CLEAR_SKILL="---
+name: t-cache-clear
+description: 清除所有翻译缓存
+context: fork
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_CLEAR_PROMPT"
+
+CODEX_T_SKILL="---
+name: t
+description: AI 翻译（支持中英双向及多语言）@author: stormzhang
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_CHECK_PROMPT
+
+$T_MD
+
+$CACHE_SAVE_PROMPT"
+
+CODEX_TS_SKILL="---
+name: ts
+description: AI 翻译 + 语音朗读（支持中英双向及多语言）@author: stormzhang
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_CHECK_PROMPT
+
+$TS_MD
+
+$CACHE_SAVE_PROMPT"
+
+CODEX_T_REFRESH_SKILL="---
+name: t-refresh
+description: 刷新翻译缓存并重新查询 AI 翻译
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_REFRESH_PROMPT
+
+$T_MD"
+
+CODEX_CACHE_STATS_SKILL="---
+name: t-cache-stats
+description: 显示翻译缓存统计信息
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_STATS_PROMPT"
+
+CODEX_CACHE_CLEAR_SKILL="---
+name: t-cache-clear
+description: 清除所有翻译缓存
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_CLEAR_PROMPT"
 
 # --- install functions ---
 
@@ -125,7 +224,8 @@ install_skill() {
     local name=$1 base_dir=$2 t_content=$3 ts_content=$4
     local t_dir="$base_dir/t"
     local ts_dir="$base_dir/ts"
-    mkdir -p "$t_dir" "$ts_dir"
+    mkdir -p "$t_dir/scripts" "$t_dir/data"
+    mkdir -p "$ts_dir/scripts" "$ts_dir/data"
     if [ -f "$t_dir/SKILL.md" ]; then
         printf "$name 已安装翻译工具，是否覆盖更新？(y/N) "
         read -r answer < /dev/tty
@@ -140,8 +240,28 @@ install_skill() {
     fi
     echo "$t_content" > "$t_dir/SKILL.md"
     echo "$ts_content" > "$ts_dir/SKILL.md"
+    local SCRIPT_SRC
+    SCRIPT_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/cache.sh"
+    if [ -f "$SCRIPT_SRC" ]; then
+        cp "$SCRIPT_SRC" "$t_dir/scripts/cache.sh"
+        cp "$SCRIPT_SRC" "$ts_dir/scripts/cache.sh"
+        chmod +x "$t_dir/scripts/cache.sh" "$ts_dir/scripts/cache.sh"
+    fi
     echo "[OK] $name - $action"
     INSTALLED=1
+}
+
+install_skill_extra() {
+    local base_dir=$1 skill_name=$2 skill_content=$3
+    local skill_dir="$base_dir/$skill_name"
+    mkdir -p "$skill_dir/scripts" "$skill_dir/data"
+    echo "$skill_content" > "$skill_dir/SKILL.md"
+    local SCRIPT_SRC
+    SCRIPT_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/cache.sh"
+    if [ -f "$SCRIPT_SRC" ]; then
+        cp "$SCRIPT_SRC" "$skill_dir/scripts/cache.sh"
+        chmod +x "$skill_dir/scripts/cache.sh"
+    fi
 }
 
 # --- detect and install ---
@@ -149,12 +269,18 @@ install_skill() {
 # Claude Code (skills with context: fork)
 if [ -d "$HOME/.claude" ]; then
     install_skill "Claude Code" "$HOME/.claude/skills" "$CLAUDE_T_SKILL" "$CLAUDE_TS_SKILL"
+    install_skill_extra "$HOME/.claude/skills" "t-refresh" "$CLAUDE_T_REFRESH_SKILL"
+    install_skill_extra "$HOME/.claude/skills" "t-cache-stats" "$CLAUDE_CACHE_STATS_SKILL"
+    install_skill_extra "$HOME/.claude/skills" "t-cache-clear" "$CLAUDE_CACHE_CLEAR_SKILL"
     rm -f "$HOME/.claude/commands/t.md" "$HOME/.claude/commands/ts.md" 2>/dev/null
 fi
 
 # Codex
 if [ -d "$HOME/.codex" ]; then
-    install_skill "Codex" "$HOME/.codex/skills" "$BASIC_T_SKILL" "$BASIC_TS_SKILL"
+    install_skill "Codex" "$HOME/.codex/skills" "$CODEX_T_SKILL" "$CODEX_TS_SKILL"
+    install_skill_extra "$HOME/.codex/skills" "t-refresh" "$CODEX_T_REFRESH_SKILL"
+    install_skill_extra "$HOME/.codex/skills" "t-cache-stats" "$CODEX_CACHE_STATS_SKILL"
+    install_skill_extra "$HOME/.codex/skills" "t-cache-clear" "$CODEX_CACHE_CLEAR_SKILL"
     rm -f "$HOME/.codex/prompts/t.md" "$HOME/.codex/prompts/ts.md" 2>/dev/null
 fi
 
@@ -192,6 +318,9 @@ echo ""
 echo "Done! v${VERSION} installed"
 echo ""
 echo "Usage:"
-echo "  /t word          translate"
-echo "  /ts word         translate + speech"
+echo "  /t word              translate (cached)"
+echo "  /ts word             translate + speech (cached)"
+echo "  /t-refresh word      force re-translate"
+echo "  /t-cache-stats       show cache statistics"
+echo "  /t-cache-clear       clear all cache"
 echo "  (Codex: \$t word / \$ts word)"
