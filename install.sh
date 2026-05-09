@@ -29,6 +29,18 @@ AI 翻译（支持中英双向及多语言）@author: stormzhang
 {当前工具名}内部命令：说明这个词在当前工具中的含义和用法，简短即可。只说当前工具，不要列举其他工具。
 
 要翻译的内容：$ARGUMENTS
+
+当输入涉及编程或技术概念时，优先选择该领域最常用的含义：
+- concurrency → 并发（而非竞争/同时发生）
+- callback → 回调（而非回拨）
+- race condition → 竞态条件（而非种族条件）
+- lazy loading → 延迟加载（而非懒惰加载）
+- greedy algorithm → 贪心算法（而非贪婪算法）
+- closure → 闭包（而非结束/关闭）
+- middleware → 中间件（而非中间件/中间软件）
+- stub/mock → 桩/模拟对象（而非残桩/嘲笑）
+- thunk → 形参（而非思考）
+- pragma → 杂注（而非pragma本身的含义）
 PROMPT_EOF
 
 read -r -d '' TS_MD << 'PROMPT_EOF'
@@ -62,6 +74,18 @@ AI 翻译 + 语音朗读（支持中英双向及多语言）@author: stormzhang
 根据当前系统自动选择对应命令。如果语音命令执行失败，不要输出错误信息，只需提示「当前系统暂不支持语音朗读」。
 
 要翻译的内容：$ARGUMENTS
+
+当输入涉及编程或技术概念时，优先选择该领域最常用的含义：
+- concurrency → 并发（而非竞争/同时发生）
+- callback → 回调（而非回拨）
+- race condition → 竞态条件（而非种族条件）
+- lazy loading → 延迟加载（而非懒惰加载）
+- greedy algorithm → 贪心算法（而非贪婪算法）
+- closure → 闭包（而非结束/关闭）
+- middleware → 中间件（而非中间软件）
+- stub/mock → 桩/模拟对象（而非残桩/嘲笑）
+- thunk → 形参（而非思考）
+- pragma → 杂注（而非pragma本身的含义）
 PROMPT_EOF
 
 # --- cache prompt logic ---
