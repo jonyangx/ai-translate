@@ -6,6 +6,8 @@
 bash -n install.sh              # Syntax check
 bash install.sh                  # Install locally (auto-detects tools)
 bash tests/test_cache.sh          # Run cache tests
+bash tests/test_install.sh         # Run install.sh heredoc/format tests
+bash tests/test_skills.sh          # Run skill installation tests
 ```
 
 ## Architecture

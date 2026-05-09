@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Can be sourced to extract variables: source install.sh
+# Set SKIP_EXEC=1 before sourcing to skip the install logic.
+[ "${SKIP_EXEC:-0}" = "1" ] && return 0 2>/dev/null
+
+DRY_RUN="${DRY_RUN:-0}"
+
 VERSION="1.3.0"
 INSTALLED=0
 
@@ -221,12 +227,15 @@ allowed-tools: [\"Bash\"]
 
 $CACHE_CLEAR_PROMPT"
 
+# --- Only run install logic when executed, not when sourced ---
+if [ "${SKIP_EXEC:-0}" = "0" ]; then
+
 # --- install functions ---
 
 install_flat() {
     local name=$1 dir=$2 t_content=$3 ts_content=$4
     mkdir -p "$dir"
-    if [ -f "$dir/t.md" ]; then
+    if [ -f "$dir/t.md" ] && [ "${DRY_RUN:-0}" = "0" ]; then
         printf "$name 已安装翻译工具，是否覆盖更新？(y/N) "
         read -r answer < /dev/tty
         if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
@@ -250,7 +259,7 @@ install_skill() {
     local ts_dir="$base_dir/ts"
     mkdir -p "$t_dir/scripts" "$t_dir/data"
     mkdir -p "$ts_dir/scripts" "$ts_dir/data"
-    if [ -f "$t_dir/SKILL.md" ]; then
+    if [ -f "$t_dir/SKILL.md" ] && [ "${DRY_RUN:-0}" = "0" ]; then
         printf "$name 已安装翻译工具，是否覆盖更新？(y/N) "
         read -r answer < /dev/tty
         if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
@@ -366,3 +375,5 @@ echo "  /t-refresh word      force re-translate"
 echo "  /t-cache-stats       show cache statistics"
 echo "  /t-cache-clear       clear all cache"
 echo "  (Codex: \$t word / \$ts word)"
+
+fi
