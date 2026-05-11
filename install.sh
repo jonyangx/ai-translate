@@ -106,6 +106,8 @@ CACHE_STATS_PROMPT='运行 `bash ./scripts/cache.sh stats` 并显示结果。不
 
 CACHE_CLEAR_PROMPT='运行 `bash ./scripts/cache.sh clear-all` 清除所有翻译缓存。显示清除结果。'
 
+CACHE_REMOVE_PROMPT='运行 `bash ./scripts/cache.sh clear "单词"` 清除指定单词的翻译缓存。显示清除结果。需要传入参数 $ARGUMENTS 作为要清除的单词。'
+
 # --- tool-specific formats ---
 
 BASIC_T_SKILL="---
@@ -177,6 +179,15 @@ allowed-tools: [\"Bash\"]
 
 $CACHE_CLEAR_PROMPT"
 
+CLAUDE_CACHE_REMOVE_SKILL="---
+name: t-cache-remove
+description: 清除指定单词的翻译缓存
+context: fork
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_REMOVE_PROMPT"
+
 CODEX_T_SKILL="---
 name: t
 description: AI 翻译（支持中英双向及多语言）@author: stormzhang
@@ -226,6 +237,14 @@ allowed-tools: [\"Bash\"]
 ---
 
 $CACHE_CLEAR_PROMPT"
+
+CODEX_CACHE_REMOVE_SKILL="---
+name: t-cache-remove
+description: 清除指定单词的翻译缓存
+allowed-tools: [\"Bash\"]
+---
+
+$CACHE_REMOVE_PROMPT"
 
 # --- Only run install logic when executed, not when sourced ---
 if [ "${SKIP_EXEC:-0}" = "0" ]; then
@@ -305,6 +324,7 @@ if [ -d "$HOME/.claude" ]; then
     install_skill_extra "$HOME/.claude/skills" "t-refresh" "$CLAUDE_T_REFRESH_SKILL"
     install_skill_extra "$HOME/.claude/skills" "t-cache-stats" "$CLAUDE_CACHE_STATS_SKILL"
     install_skill_extra "$HOME/.claude/skills" "t-cache-clear" "$CLAUDE_CACHE_CLEAR_SKILL"
+    install_skill_extra "$HOME/.claude/skills" "t-cache-remove" "$CLAUDE_CACHE_REMOVE_SKILL"
     rm -f "$HOME/.claude/commands/t.md" "$HOME/.claude/commands/ts.md" 2>/dev/null
 fi
 
@@ -314,6 +334,7 @@ if [ -d "$HOME/.codex" ]; then
     install_skill_extra "$HOME/.codex/skills" "t-refresh" "$CODEX_T_REFRESH_SKILL"
     install_skill_extra "$HOME/.codex/skills" "t-cache-stats" "$CODEX_CACHE_STATS_SKILL"
     install_skill_extra "$HOME/.codex/skills" "t-cache-clear" "$CODEX_CACHE_CLEAR_SKILL"
+    install_skill_extra "$HOME/.codex/skills" "t-cache-remove" "$CODEX_CACHE_REMOVE_SKILL"
     rm -f "$HOME/.codex/prompts/t.md" "$HOME/.codex/prompts/ts.md" 2>/dev/null
 fi
 
@@ -340,6 +361,7 @@ if [ -d "$HOME/.openclaw" ]; then
     install_skill_extra "$HOME/.openclaw/skills" "t-refresh" "$CODEX_T_REFRESH_SKILL"
     install_skill_extra "$HOME/.openclaw/skills" "t-cache-stats" "$CODEX_CACHE_STATS_SKILL"
     install_skill_extra "$HOME/.openclaw/skills" "t-cache-clear" "$CODEX_CACHE_CLEAR_SKILL"
+    install_skill_extra "$HOME/.openclaw/skills" "t-cache-remove" "$CODEX_CACHE_REMOVE_SKILL"
 fi
 
 # Hermes
@@ -348,6 +370,7 @@ if [ -d "$HOME/.hermes" ]; then
     install_skill_extra "$HOME/.hermes/skills" "t-refresh" "$CODEX_T_REFRESH_SKILL"
     install_skill_extra "$HOME/.hermes/skills" "t-cache-stats" "$CODEX_CACHE_STATS_SKILL"
     install_skill_extra "$HOME/.hermes/skills" "t-cache-clear" "$CODEX_CACHE_CLEAR_SKILL"
+    install_skill_extra "$HOME/.hermes/skills" "t-cache-remove" "$CODEX_CACHE_REMOVE_SKILL"
 fi
 
 if [ $INSTALLED -eq 0 ]; then
@@ -374,6 +397,7 @@ echo "  /ts word             translate + speech (cached)"
 echo "  /t-refresh word      force re-translate"
 echo "  /t-cache-stats       show cache statistics"
 echo "  /t-cache-clear       clear all cache"
+echo "  /t-cache-remove word remove single word cache"
 echo "  (Codex: \$t word / \$ts word)"
 
 fi
