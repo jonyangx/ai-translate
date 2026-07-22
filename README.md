@@ -14,7 +14,7 @@ AI translate tool for Claude Code, Codex, OpenCode, Cursor & Windsurf. One-line 
 2. **Zero friction** — Never leave your coding tool, just `/t word`
 3. **AI-native** — Powered by the built-in LLM, no extra API key needed
 4. **Ultra-lightweight** — Just a prompt file, zero dependencies, minimal token usage
-5. **TTS built-in** — `/ts` reads aloud after translating
+5. **TTS built-in** — `/t say` reads aloud after translating
 
 ## Features
 
@@ -47,12 +47,16 @@ The installer auto-detects which AI tools you have and installs accordingly:
 [OK] Claude Code - installed
 [OK] Codex - installed
 
-Done! v1.1.0 installed
+Done! v1.5.0 installed
 
-Usage:
-  /t word          translate
-  /ts word         translate + speech
-  (Codex: $t word / $ts word)
+Usage (all via /t):
+  /t word              translate (cached)
+  /t say word          translate + speech
+  /t cache stats       show cache statistics
+  /t cache clear       clear all cache
+  /t cache remove word remove single word cache
+  /t cache refresh word force re-translate
+  (Codex: $t word / $t say word / $t cache <subcmd>)
 ```
 
 ## Usage
@@ -120,12 +124,12 @@ Claude Code 内部命令：hook 是在特定事件（如工具调用前后）自
 shell 脚本，通过 settings.json 配置，用于自动化工作流。
 ```
 
-### `/ts` — Translate + Speech
+### `/t say` — Translate + Speech
 
-Same as `/t`, but also reads the text aloud after translating.
+`/t say <word>` translates, then reads the English text aloud (same as `/t` plus speech).
 
 ```
-> /ts deprecated
+> /t say deprecated
 
 【deprecated】 /ˈdeprəkeɪtɪd/
 adj. 已弃用的，不推荐使用的
@@ -144,6 +148,21 @@ Speech support by platform:
 | Linux | `espeak` |
 
 > Note: Speech on Windows and Linux is untested. Contributions welcome.
+
+### `/t` subcommands
+
+Everything goes through `/t`. Results are cached in a single shared SQLite database (`~/.ai-translate/cache.db`), reused across invocations and even across tools.
+
+| Command | Action |
+|---------|--------|
+| `/t <word>` | Translate (cached) |
+| `/t say <word>` | Translate + read aloud |
+| `/t cache stats` | Show cache statistics |
+| `/t cache clear` | Clear all cached translations |
+| `/t cache remove <word>` | Remove one word from the cache |
+| `/t cache refresh <word>` | Force re-translate a word and update the cache |
+
+> The cache is shared globally — a word translated in Claude Code is a cache hit in Codex too. (`say` / `cache` subcommands need skill-based tools: Claude Code / Codex / OpenClaw / Hermes. Cursor / Windsurf / OpenCode support `/t` and `/t say`.)
 
 ## Supported Tools
 

@@ -1,155 +1,123 @@
 #!/bin/bash
 
+# Structural tests for install.sh (single /t skill model): heredoc content,
+# variables, functions, and regression guards (legacy code removed, embedded
+# cache.sh in sync).
+
 set -uo pipefail
 
-INSTALL_SH="/Users/apple/opensource/ai-translate/install.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL_SH="$SCRIPT_DIR/install.sh"
 PASS=0
 FAIL=0
 
 assert_contains() {
     local desc="$1" haystack="$2" needle="$3"
-    if echo "$haystack" | grep -q "$needle"; then
-        echo "  PASS: $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  FAIL: $desc — expected to find '$needle'"
-        FAIL=$((FAIL + 1))
-    fi
+    if echo "$haystack" | grep -q "$needle"; then echo "  PASS: $desc"; PASS=$((PASS + 1)); else echo "  FAIL: $desc — expected '$needle'"; FAIL=$((FAIL + 1)); fi
 }
-
 assert_not_contains() {
     local desc="$1" haystack="$2" needle="$3"
-    if echo "$haystack" | grep -vq "$needle"; then
-        echo "  PASS: $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  FAIL: $desc — expected NOT to find '$needle'"
-        FAIL=$((FAIL + 1))
-    fi
+    if echo "$haystack" | grep -vq "$needle"; then echo "  PASS: $desc"; PASS=$((PASS + 1)); else echo "  FAIL: $desc — expected NOT '$needle'"; FAIL=$((FAIL + 1)); fi
 }
-
 assert_non_empty() {
     local desc="$1" value="$2"
-    if [ -n "$value" ]; then
-        echo "  PASS: $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  FAIL: $desc — expected non-empty"
-        FAIL=$((FAIL + 1))
-    fi
+    if [ -n "$value" ]; then echo "  PASS: $desc"; PASS=$((PASS + 1)); else echo "  FAIL: $desc — expected non-empty"; FAIL=$((FAIL + 1)); fi
+}
+assert_grep() {
+    local desc="$1" needle="$2"
+    if grep -q "$needle" "$INSTALL_SH"; then echo "  PASS: $desc"; PASS=$((PASS + 1)); else echo "  FAIL: $desc — expected '$needle' in install.sh"; FAIL=$((FAIL + 1)); fi
+}
+assert_not_grep() {
+    local desc="$1" needle="$2"
+    if ! grep -q "$needle" "$INSTALL_SH"; then echo "  PASS: $desc"; PASS=$((PASS + 1)); else echo "  FAIL: $desc — '$needle' should not be in install.sh"; FAIL=$((FAIL + 1)); fi
 }
 
-echo "=== Testing install.sh heredocs and format generation ==="
+echo "=== Testing install.sh heredocs and structure ==="
 echo ""
 
-# Extract T_MD heredoc content
 T_MD=$(sed -n '/^read -r -d .*.T_MD.*<< .PROMPT_EOF/,/^PROMPT_EOF$/p' "$INSTALL_SH" | sed '1d;$d')
-TS_MD=$(sed -n '/^read -r -d .*.TS_MD.*<< .PROMPT_EOF/,/^PROMPT_EOF$/p' "$INSTALL_SH" | sed '1d;$d')
 
-# --- Heredoc tests ---
-test_t_md_exists() {
-    assert_non_empty "T_MD heredoc is non-empty" "$T_MD"
-}
-test_ts_md_exists() {
-    assert_non_empty "TS_MD heredoc is non-empty" "$TS_MD"
-}
+test_t_md_exists() { assert_non_empty "T_MD heredoc is non-empty" "$T_MD"; }
 test_format_sections() {
-    assert_contains "T_MD contains word format (音标)" "$T_MD" "音标"
-    assert_contains "T_MD contains pos (词性)" "$T_MD" "词性"
-    assert_contains "T_MD contains example (示例)" "$T_MD" "示例"
-    assert_contains "T_MD contains translation (翻译)" "$T_MD" "翻译"
+    assert_contains "T_MD contains 音标" "$T_MD" "音标"
+    assert_contains "T_MD contains 词性" "$T_MD" "词性"
+    assert_contains "T_MD contains 示例" "$T_MD" "示例"
+    assert_contains "T_MD contains 翻译" "$T_MD" "翻译"
     assert_contains "T_MD contains tech term hint" "$T_MD" "编程或技术概念"
-    assert_contains "T_MD contains disambiguation entries" "$T_MD" "贪心算法"
-    assert_contains "T_MD contains closure translation" "$T_MD" "闭包"
+    assert_contains "T_MD contains 贪心算法" "$T_MD" "贪心算法"
+    assert_contains "T_MD contains 闭包" "$T_MD" "闭包"
+    assert_contains "T_MD contains 杂注" "$T_MD" "杂注"
 }
-test_ts_md_speech() {
-    assert_contains "TS_MD contains macOS say command" "$TS_MD" "say -v Samantha"
-    assert_contains "TS_MD contains Linux espeak command" "$TS_MD" "espeak"
-    assert_contains "TS_MD contains Windows PowerShell command" "$TS_MD" "SpeechSynthesizer"
-    assert_contains "TS_MD contains tech term hint" "$TS_MD" "编程或技术概念"
-    assert_contains "TS_MD contains greedy algorithm disambiguation" "$TS_MD" "贪心算法"
+test_t_md_is_pure_translate() {
+    # T_MD is the shared translation-rules core; speech/cache live in the assembled bodies
+    assert_not_contains "T_MD has no speech" "$T_MD" "say -v Samantha"
 }
-test_no_tool_names_in_base() {
-    assert_not_contains "T_MD does not hardcode tool names" "$T_MD" "Claude Code 内部命令"
-    assert_contains "T_MD uses placeholder for tool name" "$T_MD" "{当前工具名}"
-}
-test_no_speech_in_t() {
-    assert_not_contains "T_MD does not contain speech commands" "$T_MD" "say -v Samantha"
-    assert_not_contains "T_MD does not contain espeak" "$T_MD" "espeak"
-}
-
-# --- Version test ---
 test_version() {
     local version
     version=$(grep -m1 '^VERSION=' "$INSTALL_SH" | sed 's/VERSION="\([^"]*\)"/\1/')
-    if [ -n "$version" ]; then
-        echo "  PASS: VERSION is set to '$version'"
-        PASS=$((PASS + 1))
+    if [ -n "$version" ]; then echo "  PASS: VERSION is '$version'"; PASS=$((PASS + 1)); else echo "  FAIL: VERSION not set"; FAIL=$((FAIL + 1)); fi
+}
+# Cache prompt snippets were folded into T_BODY inline; none should remain.
+test_cache_prompts_removed() {
+    local v
+    for v in CACHE_CHECK_PROMPT CACHE_SAVE_PROMPT CACHE_REFRESH_PROMPT CACHE_STATS_PROMPT CACHE_CLEAR_PROMPT CACHE_REMOVE_PROMPT; do
+        assert_not_grep "$v removed (merged into T_BODY)" "^$v="
+    done
+}
+test_new_structure() {
+    local v
+    for v in T_DESC T_BODY T_FLAT_BODY CACHE_SH_PATH; do
+        assert_grep "$v is defined" "^$v="
+    done
+    assert_grep "CACHE_SH_SRC heredoc defined" "read -r -d '' CACHE_SH_SRC"
+}
+test_build_skill_fn() { assert_grep "build_skill() is defined" "^build_skill()" ; }
+test_install_functions() {
+    local fn
+    for fn in install_global_cache install_tool_skills install_tool_flat; do
+        assert_grep "$fn() is defined" "^$fn()"
+    done
+}
+# Everything from the multi-skill era must be gone.
+test_legacy_removed() {
+    assert_not_grep "no legacy *_SKILL variables" "^[A-Z_]*_SKILL="
+    local fn
+    for fn in install_flat install_skill install_skill_extra; do
+        assert_not_grep "$fn() removed" "^$fn()"
+    done
+    local v
+    for v in TS_DESC TC_DESC TS_BODY T_CACHE_BODY; do
+        assert_not_grep "$v removed" "^$v="
+    done
+    # No standalone TS_MD heredoc — speech is inlined into the bodies
+    if grep -q "read -r -d '' TS_MD" "$INSTALL_SH"; then
+        echo "  FAIL: TS_MD heredoc should be removed"; FAIL=$((FAIL + 1))
     else
-        echo "  FAIL: VERSION is not set"
-        FAIL=$((FAIL + 1))
+        echo "  PASS: no TS_MD heredoc"; PASS=$((PASS + 1))
+    fi
+}
+test_embedded_cache_in_sync() {
+    local embedded src
+    embedded=$(sed -n "/<< 'CACHE_SH_EOF'/,/^CACHE_SH_EOF\$/p" "$INSTALL_SH" | sed '1d;$d')
+    src=$(cat "$SCRIPT_DIR/scripts/cache.sh")
+    if [ "$embedded" = "$src" ]; then
+        echo "  PASS: embedded cache.sh is byte-identical to scripts/cache.sh"; PASS=$((PASS + 1))
+    else
+        echo "  FAIL: embedded cache.sh drifts from scripts/cache.sh"; FAIL=$((FAIL + 1))
     fi
 }
 
-# --- Cache prompt variables ---
-test_cache_prompts() {
-    local vars="CACHE_CHECK_PROMPT CACHE_SAVE_PROMPT CACHE_REFRESH_PROMPT CACHE_STATS_PROMPT CACHE_CLEAR_PROMPT"
-    for v in $vars; do
-        if grep -q "^$v=" "$INSTALL_SH"; then
-            echo "  PASS: $v is defined"
-            PASS=$((PASS + 1))
-        else
-            echo "  FAIL: $v is missing"
-            FAIL=$((FAIL + 1))
-        fi
-    done
-}
-
-# --- Skill format variables ---
-test_skill_formats() {
-    local formats="CLAUDE_T_SKILL CLAUDE_TS_SKILL CODEX_T_SKILL CODEX_TS_SKILL BASIC_T_SKILL BASIC_TS_SKILL"
-    formats="$formats CLAUDE_T_REFRESH_SKILL CODEX_T_REFRESH_SKILL"
-    formats="$formats CLAUDE_CACHE_STATS_SKILL CODEX_CACHE_STATS_SKILL"
-    formats="$formats CLAUDE_CACHE_CLEAR_SKILL CODEX_CACHE_CLEAR_SKILL"
-    for f in $formats; do
-        if grep -q "^$f=" "$INSTALL_SH"; then
-            echo "  PASS: $f is defined"
-            PASS=$((PASS + 1))
-        else
-            echo "  FAIL: $f is missing"
-            FAIL=$((FAIL + 1))
-        fi
-    done
-}
-
-# --- Install functions ---
-test_install_functions() {
-    local funcs="install_flat install_skill install_skill_extra"
-    for fn in $funcs; do
-        if grep -q "^$fn()" "$INSTALL_SH"; then
-            echo "  PASS: $fn() is defined"
-            PASS=$((PASS + 1))
-        else
-            echo "  FAIL: $fn() is missing"
-            FAIL=$((FAIL + 1))
-        fi
-    done
-}
-
-# --- Run all tests ---
 test_t_md_exists
-test_ts_md_exists
 test_format_sections
-test_ts_md_speech
-test_no_tool_names_in_base
-test_no_speech_in_t
+test_t_md_is_pure_translate
 test_version
-test_cache_prompts
-test_skill_formats
+test_cache_prompts_removed
+test_new_structure
+test_build_skill_fn
 test_install_functions
+test_legacy_removed
+test_embedded_cache_in_sync
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
-if [ "$FAIL" -gt 0 ]; then
-    exit 1
-fi
+if [ "$FAIL" -gt 0 ]; then exit 1; fi

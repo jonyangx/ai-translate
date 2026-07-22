@@ -14,7 +14,7 @@ AI 编程工具的翻译插件，一行命令安装，支持多语言翻译和�
 2. **零摩擦** — 不离开编码工具，`/t word` 直接查词
 3. **AI 原生** — 利用编码工具内置 LLM，不需要额外 API Key
 4. **极致轻量** — 本质是一段 prompt，零依赖、秒安装、token 消耗极少
-5. **TTS 集成** — `/ts` 带语音朗读
+5. **TTS 集成** — `/t say` 带语音朗读
 
 ## 功能特性
 
@@ -47,12 +47,16 @@ cd ai-translate
 [OK] Claude Code - installed
 [OK] Codex - installed
 
-Done! v1.1.0 installed
+Done! v1.5.0 installed
 
-Usage:
-  /t word          translate
-  /ts word         translate + speech
-  (Codex: $t word / $ts word)
+Usage (全部通过 /t):
+  /t word              翻译（带缓存）
+  /t say word          翻译 + 语音朗读
+  /t cache stats       查看缓存统计
+  /t cache clear       清空全部缓存
+  /t cache remove word 删除单个词缓存
+  /t cache refresh word 强制重新翻译
+  (Codex: $t word / $t say word / $t cache <子命令>)
 ```
 
 ## 使用方法
@@ -118,12 +122,12 @@ Claude Code 内部命令：hook 是在特定事件（如工具调用前后）自
 shell 脚本，通过 settings.json 配置，用于自动化工作流。
 ```
 
-### `/ts` — 翻译 + 语音朗读
+### `/t say` — 翻译 + 语音朗读
 
-功能同 `/t`，翻译完成后自动朗读英文原文。
+`/t say <词>` 翻译完成后自动朗读英文原文（相当于 `/t` 加语音）。
 
 ```
-> /ts deprecated
+> /t say deprecated
 
 【deprecated】 /ˈdeprəkeɪtɪd/
 adj. 已弃用的，不推荐使用的
@@ -142,6 +146,21 @@ adj. 已弃用的，不推荐使用的
 | Linux | `espeak` |
 
 > 注：Windows 和 Linux 平台的语音功能未经测试，欢迎反馈。
+
+### `/t` 子命令
+
+所有功能都通过 `/t` 完成。翻译结果统一缓存在一个共享的 SQLite 数据库（`~/.ai-translate/cache.db`），跨调用、跨工具复用。
+
+| 命令 | 作用 |
+|------|------|
+| `/t <词>` | 翻译（带缓存） |
+| `/t say <词>` | 翻译 + 语音朗读 |
+| `/t cache stats` | 查看缓存统计 |
+| `/t cache clear` | 清空全部缓存 |
+| `/t cache remove <词>` | 删除单个词的缓存 |
+| `/t cache refresh <词>` | 强制重新翻译并更新缓存 |
+
+> 缓存全局共享 —— 在 Claude Code 里翻译过的词，在 Codex 里也能命中。（`say` / `cache` 子命令仅适用于 skill 类工具：Claude Code / Codex / OpenClaw / Hermes；Cursor / Windsurf / OpenCode 支持 `/t` 与 `/t say`。）
 
 ## 支持工具
 
