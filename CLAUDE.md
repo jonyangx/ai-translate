@@ -9,10 +9,9 @@ A translation plugin for AI coding tools (Claude Code, Codex, Cursor, Windsurf, 
 ## Architecture
 
 ```
-install.sh              ← THE core file: heredoc-embedded prompts + install logic + version
-scripts/cache.sh        ← SQLite cache manager (check/get/set/clear/stats/refresh)
-tests/test_cache.sh     ← Cache test suite
-prompts/t.md, ts.md     ← Reference-only prompt source (not used at install time)
+install.sh              ← THE core file: heredoc-embedded prompts + cache.sh + install logic
+scripts/cache.sh        ← SQLite cache manager; also embedded in install.sh for curl installs
+tests/                  ← test_cache.sh, test_install.sh, test_skills.sh
 ```
 
 `install.sh` is the single source of truth. It embeds all prompts as heredoc variables, generates tool-specific skill formats (YAML frontmatter, `context: fork`, `allowed-tools`) by shell variable composition, and copies `cache.sh` into each skill's `scripts/` directory during install.
@@ -29,7 +28,7 @@ The format variants are assembled in `install.sh` by combining `T_MD`/`TS_MD` ba
 
 ## Cache System
 
-SQLite-based translation cache at `skills/t/data/cache.db`. Flow: check cache → hit returns cached result (📦), miss triggers AI translation then saves (🤖). Chinese→English results auto-expand into reverse-lookup entries. Extra skills: `t-refresh` (🔄), `t-cache-stats`, `t-cache-clear`.
+SQLite translation cache at `~/.ai-translate/cache.db` (global, shared across all skills and tools). Flow: `/t` checks cache → hit returns cached result (📦), miss triggers AI translation then saves (🤖); Chinese→English results auto-expand into reverse-lookup entries. All entry points live in the single `/t` skill: `/t <word>` (cached), `/t say <word>` (speech), `/t cache <stats|clear|remove|refresh>`.
 
 ## Development
 
@@ -41,7 +40,7 @@ bash tests/test_cache.sh    # Run cache tests
 
 ## Conventions
 
-- Prompt edits must update `install.sh` heredocs, not just `prompts/` files
+- Prompt edits must update `install.sh` heredocs (the single source of truth)
 - Version lives in `VERSION` variable at top of `install.sh`
 - `data/` directory is gitignored runtime state (SQLite DB)
 - Design docs in `docs/superpowers/` (plans, specs) — not shipped with install

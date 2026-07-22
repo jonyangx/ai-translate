@@ -12,11 +12,11 @@ bash tests/test_skills.sh          # Run skill installation tests
 
 ## Architecture
 
-`install.sh` is the **single source of truth** — it embeds all prompts as heredoc variables and generates tool-specific skill formats via shell variable composition. `prompts/t.md` and `prompts/ts.md` are reference-only and not used during install. Never edit the prompt files directly; edit the heredocs in `install.sh`.
+`install.sh` is the **single source of truth** — it embeds all prompts (and `cache.sh`) as heredoc variables and generates the single `/t` skill via the `build_skill()` builder. Never edit prompt files directly; edit the heredocs in `install.sh`.
 
 ## Version
 
-The version lives in the `VERSION` variable at the top of `install.sh` (line 3).
+The version lives in the `VERSION` variable near the top of `install.sh`.
 
 ## Multi-Tool Skill Formats
 
@@ -29,7 +29,7 @@ The version lives in the `VERSION` variable at the top of `install.sh` (line 3).
 
 ## Cache System
 
-SQLite at `<skill>/data/cache.db`. Cache logic is injected into prompts via shell variables (`CACHE_CHECK_PROMPT`, `CACHE_SAVE_PROMPT`, etc.) assembled in `install.sh`. `scripts/cache.sh` is copied into each skill's `scripts/` directory during install. The `data/` directory is gitignored.
+Translations are cached in a single global SQLite DB at `~/.ai-translate/cache.db`, shared across all skills and tools. Cache logic is inlined into the `/t` skill body in `install.sh`, which calls `~/.ai-translate/cache.sh` by absolute path. `scripts/cache.sh` is the dev/test source of truth and is also embedded in `install.sh` for self-contained `curl|bash` installs.
 
 `cache.sh` commands: `check`, `get`, `set`, `clear`, `clear-all`, `stats`, `refresh`.
 
