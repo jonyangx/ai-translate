@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # ai-translate cache manager
-# Manages SQLite-based translation cache
+# Manages a globally-shared SQLite translation cache.
+# DB location defaults to ~/.ai-translate/cache.db; override with AI_TRANSLATE_DATA_DIR.
+# Every command writes a single, machine-parseable line to stdout (hit/miss/saved/...).
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATA_DIR="$SCRIPT_DIR/../data"
+DATA_DIR="${AI_TRANSLATE_DATA_DIR:-$HOME/.ai-translate}"
 DB_PATH="$DATA_DIR/cache.db"
 
 ensure_sqlite3() {
@@ -66,17 +67,17 @@ init_db() {
     ensure_sqlite3 || return 1
     mkdir -p "$DATA_DIR"
     if [ ! -f "$DB_PATH" ]; then
-        sqlite3 "$DB_PATH" <<'SQL'
-PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
-CREATE TABLE IF NOT EXISTS translations (
+        # journal_mode is persistent (stored in the DB header) — set once on creation.
+        # Output is redirected so it never pollutes stdout, which callers parse.
+        sqlite3 "$DB_PATH" "PRAGMA journal_mode=WAL;" >/dev/null 2>&1 || true
+        sqlite3 "$DB_PATH" "PRAGMA synchronous=NORMAL;" >/dev/null 2>&1 || true
+        sqlite3 "$DB_PATH" "CREATE TABLE IF NOT EXISTS translations (
     input_key TEXT PRIMARY KEY,
     original_input TEXT NOT NULL,
     response TEXT NOT NULL,
     translated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     source TEXT DEFAULT 'ai'
-);
-SQL
+);"
     fi
 }
 
@@ -117,11 +118,14 @@ extract_english_words() {
         grep -E '^[a-zA-Z]'
 }
 
+# cmd_set <key> <original> <response> [source]
+# source defaults to 'ai'; 'expanded' for reverse-lookup entries, 'refreshed' for /t cache refresh.
 cmd_set() {
-    local key original response
+    local key original response source
     key="$(normalize_input "$1")"
     original="$2"
     response="$3"
+    source="${4:-ai}"
 
     init_db || return 1
 
@@ -130,7 +134,8 @@ cmd_set() {
     escaped_orig="$(sqlite3_escape "$original")"
     escaped_resp="$(sqlite3_escape "$response")"
 
-    sqlite3 "$DB_PATH" "INSERT OR REPLACE INTO translations (input_key, original_input, response, translated_at, source) VALUES ('$escaped_key', '$escaped_orig', '$escaped_resp', CURRENT_TIMESTAMP, 'ai');"
+    # INSERT OR REPLACE is an upsert, so refresh simply re-sets with source='refreshed'.
+    sqlite3 "$DB_PATH" "INSERT OR REPLACE INTO translations (input_key, original_input, response, translated_at, source) VALUES ('$escaped_key', '$escaped_orig', '$escaped_resp', CURRENT_TIMESTAMP, '$source');"
 
     # Multi-word expansion: if Chinese input, extract English words and create individual entries
     if [[ "$original" =~ [一-龥] ]]; then
@@ -139,12 +144,10 @@ cmd_set() {
         if [ -n "$english_words" ]; then
             while IFS= read -r word; do
                 [ -z "$word" ] && continue
-                local norm_word
+                local norm_word escaped_word
                 norm_word="$(normalize_input "$word")"
-                local escaped_word escaped_word_resp
                 escaped_word="$(sqlite3_escape "$norm_word")"
-                escaped_word_resp="$(sqlite3_escape "$response")"
-                sqlite3 "$DB_PATH" "INSERT OR REPLACE INTO translations (input_key, original_input, response, translated_at, source) VALUES ('$escaped_word', '$word', '$escaped_word_resp', CURRENT_TIMESTAMP, 'expanded');"
+                sqlite3 "$DB_PATH" "INSERT OR REPLACE INTO translations (input_key, original_input, response, translated_at, source) VALUES ('$escaped_word', '$word', '$escaped_resp', CURRENT_TIMESTAMP, 'expanded');"
             done <<< "$english_words"
         fi
     fi
@@ -178,15 +181,11 @@ cmd_stats() {
 }
 
 cmd_refresh() {
-    local key original response
-    key="$(normalize_input "$1")"
+    local original response
     original="$2"
     response="$3"
     init_db || return 1
-    local escaped_key
-    escaped_key="$(sqlite3_escape "$key")"
-    sqlite3 "$DB_PATH" "DELETE FROM translations WHERE input_key = '$escaped_key';"
-    cmd_set "$1" "$2" "$3" >/dev/null
+    cmd_set "$1" "$original" "$response" "refreshed" >/dev/null
     echo "refreshed"
 }
 
